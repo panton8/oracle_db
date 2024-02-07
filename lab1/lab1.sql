@@ -86,3 +86,30 @@ BEGIN
     COMMIT;
 END delete_from_mytable;
 /
+
+--6
+CREATE OR REPLACE FUNCTION calculate_total_compensation(
+    p_monthly_salary NUMBER,
+    p_annual_bonus_percentage NUMBER
+) RETURN NUMBER AS
+    v_annual_bonus_percentage NUMBER;
+    v_total_compensation NUMBER;
+BEGIN
+    IF p_monthly_salary <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Monthly salary must be a positive number');
+    END IF;
+    
+    IF p_annual_bonus_percentage < 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, 'The percentage of annual bonuses cannot be negative');
+    END IF;
+    
+    v_annual_bonus_percentage := p_annual_bonus_percentage / 100;
+    
+    v_total_compensation := (1 + v_annual_bonus_percentage) * 12 * p_monthly_salary;
+    
+    RETURN v_total_compensation;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20003, 'An error occurred:' || SQLERRM);
+END calculate_total_compensation;
+/
