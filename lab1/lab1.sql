@@ -43,3 +43,46 @@ BEGIN
     END IF;
 END;
 /
+
+--4
+CREATE OR REPLACE FUNCTION generate_insert_command(p_id NUMBER) RETURN VARCHAR2 AS
+    v_val NUMBER;
+    v_insert_command VARCHAR2(80);
+BEGIN
+    SELECT val INTO v_val FROM MyTable WHERE id = p_id;
+    v_insert_command := 'INSERT INTO MyTable (id, val) VALUES (' || p_id || ', ' || v_val || ');';    
+    DBMS_OUTPUT.PUT_LINE(v_insert_command);
+    RETURN v_insert_command;
+END;
+/
+
+--5
+CREATE OR REPLACE PROCEDURE insert_into_mytable(
+    p_val NUMBER
+) AS
+    v_new_id NUMBER;
+BEGIN
+    SELECT COALESCE(MAX(id), 0) + 1 INTO v_new_id FROM MyTable;
+    INSERT INTO MyTable (id, val) VALUES (v_new_id, p_val);
+    COMMIT;
+END insert_into_mytable;
+/
+
+CREATE OR REPLACE PROCEDURE update_mytable(
+    p_id NUMBER,
+    p_new_val NUMBER
+) AS
+BEGIN
+    UPDATE MyTable SET val = p_new_val WHERE id = p_id;
+    COMMIT;
+END update_mytable;
+/
+
+CREATE OR REPLACE PROCEDURE delete_from_mytable(
+    p_id NUMBER
+) AS
+BEGIN
+    DELETE FROM MyTable WHERE id = p_id;
+    COMMIT;
+END delete_from_mytable;
+/
