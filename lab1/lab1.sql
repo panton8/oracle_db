@@ -12,7 +12,7 @@ CREATE TABLE MyTable(
 DECLARE
     v_counter NUMBER := 1;
 BEGIN
-    WHILE v_counter <= 10000 LOOP
+    WHILE v_counter <= 10 LOOP
         INSERT INTO MyTable (id, val)
         VALUES (v_counter, FLOOR(DBMS_RANDOM.VALUE(1, 10000)));
         v_counter := v_counter + 1;
@@ -45,12 +45,12 @@ END;
 /
 
 --4
-CREATE OR REPLACE FUNCTION generate_insert_command(p_id NUMBER) RETURN VARCHAR2 AS
-    v_val NUMBER;
+CREATE OR REPLACE FUNCTION generate_insert_command RETURN VARCHAR2 AS
+    v_id NUMBER := FLOOR(DBMS_RANDOM.VALUE(1, 10000));
+    v_val NUMBER := FLOOR(DBMS_RANDOM.VALUE(1, 10000));
     v_insert_command VARCHAR2(80);
 BEGIN
-    SELECT val INTO v_val FROM MyTable WHERE id = p_id;
-    v_insert_command := 'INSERT INTO MyTable (id, val) VALUES (' || p_id || ', ' || v_val || ');';    
+    v_insert_command := 'INSERT INTO MyTable (id, val) VALUES (' || v_id || ', ' || v_val || ');';    
     DBMS_OUTPUT.PUT_LINE(v_insert_command);
     RETURN v_insert_command;
 END;
@@ -89,27 +89,63 @@ END delete_from_mytable;
 
 --6
 CREATE OR REPLACE FUNCTION calculate_total_compensation(
-    p_monthly_salary NUMBER,
-    p_annual_bonus_percentage NUMBER
+    p_monthly_salary IN VARCHAR2,
+    p_annual_bonus_percentage IN VARCHAR2
 ) RETURN NUMBER AS
     v_annual_bonus_percentage NUMBER;
     v_total_compensation NUMBER;
+    
+    e_negative_value EXCEPTION;
+    e_null           EXCEPTION;
 BEGIN
-    IF p_monthly_salary <= 0 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Monthly salary must be a positive number');
+    IF (p_monthly_salary IS NULL OR p_annual_bonus_percentage IS NULL) THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Both values must not be null');
     END IF;
     
-    IF p_annual_bonus_percentage < 0 THEN
-        RAISE_APPLICATION_ERROR(-20002, 'The percentage of annual bonuses cannot be negative');
+    BEGIN
+        v_annual_bonus_percentage := TO_NUMBER(p_annual_bonus_percentage);
+        v_total_compensation := TO_NUMBER(p_monthly_salary);
+    EXCEPTION
+        WHEN VALUE_ERROR THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Both values must be numbers');
+    END;
+    
+    IF v_total_compensation <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'Monthly salary must be a positive number');
     END IF;
     
-    v_annual_bonus_percentage := p_annual_bonus_percentage / 100;
+    IF v_annual_bonus_percentage < 0 THEN
+        RAISE_APPLICATION_ERROR(-20004, 'The percentage of annual bonuses cannot be negative');
+    END IF;
     
-    v_total_compensation := (1 + v_annual_bonus_percentage) * 12 * p_monthly_salary;
+    v_annual_bonus_percentage := v_annual_bonus_percentage / 100;
+    
+    v_total_compensation := (1 + v_annual_bonus_percentage) * 12 * v_total_compensation;
     
     RETURN v_total_compensation;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE_APPLICATION_ERROR(-20003, 'An error occurred:' || SQLERRM);
+        RAISE_APPLICATION_ERROR(-20005, 'An error occurred: ' || SQLERRM);
 END calculate_total_compensation;
+/
+
+# additional task
+CREATE OR REPLACE PROCEDURE inserting_check(
+    p_id NUMBER, p_val NUMBER
+) AS
+    v_count NUMBER;
+    v_insert_command VARCHAR2(80);
+BEGIN
+    SELECT COUNT(*) 
+    INTO v_count 
+    FROM MyTable
+    WHERE id = p_id;
+    
+    IF v_count > 0 THEN
+        DBMS_OUTPUT.PUT_LINE('ERROR');
+    ELSE
+        v_insert_command := 'INSERT INTO MyTable (id, val) VALUES (' || p_id || ', ' || p_val || ');';    
+        DBMS_OUTPUT.PUT_LINE(v_insert_command);
+    END IF;
+END;
 /
