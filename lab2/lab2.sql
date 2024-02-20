@@ -51,6 +51,38 @@ BEGIN
 END;
 /
 
+-- Unique ID for groups
+CREATE OR REPLACE TRIGGER check_group_id_unique
+BEFORE INSERT OR UPDATE OF id ON Groups
+FOR EACH ROW
+DECLARE
+    id_count NUMBER;
+BEGIN
+    SELECT COUNT(*)
+    INTO id_count
+    FROM Groups
+    WHERE id = :NEW.id;
+
+    IF id_count > 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'ID must be unique in Groups table');
+    END IF;
+END;
+/
+
+-- ID generation for groups
+CREATE OR REPLACE TRIGGER generate_group_id
+BEFORE INSERT ON Groups
+FOR EACH ROW
+BEGIN
+    IF :NEW.id IS NULL THEN
+        SELECT COALESCE(MAX(id), 0) + 1
+        INTO :NEW.id
+        FROM Groups;
+    END IF;
+END;
+/
+    
+
 -- unigue name for groups
 
 CREATE OR REPLACE TRIGGER check_group_name_unique
@@ -108,4 +140,77 @@ BEGIN
         VALUES ('DELETE', :OLD.id, :OLD.name, :OLD.group_id, SYSTIMESTAMP);
     END IF;
 END;
+/
+
+--5
+
+CREATE OR REPLACE PROCEDURE restore_students_info (
+    restore_time TIMESTAMP,
+    time_offset_minutes NUMBER DEFAULT NULL
+) AS
+    restored_time TIMESTAMP;
+BEGIN
+    IF time_offset_minutes IS NOT NULL THEN
+        restored_time := restore_time + (time_offset_minutes / (24 * 60)); 
+    ELSE
+        restored_time := restore_time;
+    END IF;
+
+    FOR log_rec IN (
+        SELECT *
+        FROM Students_Log
+        WHERE action_date <= restored_time
+        ORDER BY action_date DESC
+    ) LOOP
+        IF log_rec.action = 'INSERT' THEN
+            INSERT INTO Students (id, name, group_id)
+            VALUES (log_rec.student_id, log_rec.student_name, log_rec.group_id);
+        ELSIF log_rec.action = 'UPDATE' THEN
+            UPDATE Students
+            SET name = log_rec.student_name, group_id = log_rec.group_id
+            WHERE id = log_rec.student_id;
+        ELSIF log_rec.action = 'DELETE' THEN
+            DELETE FROM Students
+            WHERE id = log_rec.student_id;
+        END IF;
+    END LOOP;
+END;
+/
+
+
+--6
+
+CREATE OR REPLACE TRIGGER update_groups_c_val
+FOR INSERT OR UPDATE OR DELETE ON Students
+COMPOUND TRIGGER
+    total_students NUMBER;
+
+    AFTER EACH ROW IS
+    BEGIN
+        IF INSERTING THEN
+            total_students := 1;
+        ELSIF UPDATING THEN
+            IF :NEW.group_id = :OLD.group_id THEN
+                total_students := 0;
+            ELSE
+                total_students := -1;
+            END IF;
+        ELSIF DELETING THEN
+            total_students := -1;
+        END IF;
+    END AFTER EACH ROW;
+
+    AFTER STATEMENT IS
+    BEGIN
+        FOR group_rec IN (
+            SELECT group_id, COUNT(*) AS group_count
+            FROM Students
+            GROUP BY group_id
+        ) LOOP
+            UPDATE Groups
+            SET c_val = group_rec.group_count
+            WHERE id = group_rec.group_id;
+        END LOOP;
+    END AFTER STATEMENT;
+END update_groups_c_val;
 /
