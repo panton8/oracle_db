@@ -1,22 +1,21 @@
 DROP TABLE Students;
 DROP TABLE Groups;
+DROP TABLE Students_Log;
 
---1
-CREATE TABLE Students(
-    id NUMBER,
-    name VARCHAR2 NOT NULL,
-    group_id NUMBER NOT NULL,
-    PRIMARY KEY (id)
-);
-/
 
-CREATE TABLE Groups(
-    id NUMBER,
-    name VARCHAR2 NOT NULL,
-    c_val NUMBER NOT NULL,
-    PRIMARY KEY (id)
+-- 1
+CREATE TABLE Students (
+    id NUMBER PRIMARY KEY,
+    name VARCHAR2(100) NOT NULL,
+    group_id NUMBER NOT NULL
 );
-/
+
+CREATE TABLE Groups (
+    id NUMBER PRIMARY KEY,
+    name VARCHAR2(100) NOT NULL,
+    c_val NUMBER NOT NULL
+);
+
 
 --2
 
@@ -78,5 +77,35 @@ BEFORE DELETE ON Groups
 FOR EACH ROW
 BEGIN
     DELETE FROM Students WHERE group_id = :OLD.id;
+END;
+/
+
+--4
+
+CREATE TABLE Students_Log (
+    log_id NUMBER GENERATED ALWAYS AS IDENTITY,
+    action VARCHAR2(50),
+    student_id NUMBER,
+    student_name VARCHAR2(100),
+    group_id NUMBER,
+    action_date TIMESTAMP,
+    PRIMARY KEY (log_id)
+);
+/
+
+CREATE OR REPLACE TRIGGER student_action_logging
+AFTER INSERT OR UPDATE OR DELETE ON Students
+FOR EACH ROW
+BEGIN
+    IF INSERTING THEN
+        INSERT INTO Students_Log (action, student_id, student_name, group_id, action_date)
+        VALUES ('INSERT', :NEW.id, :NEW.name, :NEW.group_id, SYSTIMESTAMP);
+    ELSIF UPDATING THEN
+        INSERT INTO Students_Log (action, student_id, student_name, group_id, action_date)
+        VALUES ('UPDATE', :OLD.id, :OLD.name, :OLD.group_id, SYSTIMESTAMP);
+    ELSIF DELETING THEN
+        INSERT INTO Students_Log (action, student_id, student_name, group_id, action_date)
+        VALUES ('DELETE', :OLD.id, :OLD.name, :OLD.group_id, SYSTIMESTAMP);
+    END IF;
 END;
 /
