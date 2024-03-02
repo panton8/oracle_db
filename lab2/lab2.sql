@@ -149,6 +149,7 @@ CREATE OR REPLACE PROCEDURE restore_students_info (
     time_offset_minutes NUMBER DEFAULT NULL
 ) AS
     restored_time TIMESTAMP;
+    student_exists NUMBER;
 BEGIN
     IF time_offset_minutes IS NOT NULL THEN
         restored_time := restore_time + (time_offset_minutes / (24 * 60)); 
@@ -162,16 +163,14 @@ BEGIN
         WHERE action_date <= restored_time
         ORDER BY action_date DESC
     ) LOOP
-        IF log_rec.action = 'INSERT' THEN
+        SELECT COUNT(*)
+        INTO student_exists
+        FROM Students
+        WHERE id = log_rec.student_id;
+
+        IF student_exists = 0 AND log_rec.action = 'DELETE' THEN
             INSERT INTO Students (id, name, group_id)
             VALUES (log_rec.student_id, log_rec.student_name, log_rec.group_id);
-        ELSIF log_rec.action = 'UPDATE' THEN
-            UPDATE Students
-            SET name = log_rec.student_name, group_id = log_rec.group_id
-            WHERE id = log_rec.student_id;
-        ELSIF log_rec.action = 'DELETE' THEN
-            DELETE FROM Students
-            WHERE id = log_rec.student_id;
         END IF;
     END LOOP;
 END;
@@ -181,7 +180,7 @@ END;
 --6
 
 CREATE OR REPLACE TRIGGER update_groups_c_val
-FOR INSERT OR UPDATE OR DELETE ON Students
+FOR INSERT OR UPDATE OR DELETE ON Students 
 COMPOUND TRIGGER
     total_students NUMBER;
 
