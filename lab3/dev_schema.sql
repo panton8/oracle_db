@@ -183,3 +183,13 @@ create table dev.tst_c2(id number primary key, id2 number, FOREIGN KEY (id2) REF
 /
 ALTER TABLE dev.tst_c1 ADD CONSTRAINT fk_c2_id FOREIGN KEY (id1) REFERENCES dev.tst_c2(id);
 -- alter table dev.tst_c1 drop CONSTRAINT fk_c2_id
+
+
+
+-- Additional task
+create or replace procedure dev.i_dont_pass
+( del_id in number )
+is
+begin
+    delete from dev.MyTable where id=del_id;
+end;
